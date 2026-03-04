@@ -6,8 +6,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import structlog
 
-from taijitu.config import settings
-
 # ── LOGGING ───────────────────────────────────────────
 log = structlog.get_logger()
 
