@@ -2,8 +2,6 @@
 # TAIJITU complete stack — all 8 services
 # Start everything with: docker-compose up -d
 
-version: "3.9"
-
 services:
 
   # ── POSTGRESQL + TIMESCALEDB ──────────────────────

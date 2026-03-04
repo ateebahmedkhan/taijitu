@@ -24,7 +24,7 @@ pandas==2.2.2
 
 # Networking
 scapy==2.5.0
-requests==2.32.0
+requests==2.32.3
 python-nmap==0.7.1
 
 # Alerting
@@ -35,4 +35,5 @@ cryptography==42.0.8
 bandit==1.7.9
 
 # Utilities
-s
+structlog==24.1.0
+schedule==1.2.2
