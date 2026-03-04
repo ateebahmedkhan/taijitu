@@ -1,0 +1,152 @@
+# docker-compose.yml
+# TAIJITU complete stack — all 8 services
+# Start everything with: docker-compose up -d
+
+version: "3.9"
+
+services:
+
+  # ── POSTGRESQL + TIMESCALEDB ──────────────────────
+  # Primary database — stores everything permanently
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: taijitu-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: taijitu
+      POSTGRES_USER: taijitu
+      POSTGRES_PASSWORD: taijitu_secure_2026
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taijitu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── REDIS ─────────────────────────────────────────
+  # Ultra-fast cache — attacker profiles live here
+  redis:
+    image: redis:7-alpine
+    container_name: taijitu-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── OLLAMA ────────────────────────────────────────
+  # Local AI — Guardian and Adversary minds run here
+  # Zero cost, zero internet, data never leaves machine
+  ollama:
+    image: ollama/ollama:latest
+    container_name: taijitu-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── TAIJITU API ───────────────────────────────────
+  # FastAPI application — the brain of TAIJITU
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taijitu-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_URL=redis://redis:6379/0
+      - OLLAMA_BASE_URL=http://ollama:11434
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    volumes:
+      - .:/app
+    command: python main.py
+
+  # ── CELERY WORKER ─────────────────────────────────
+  # Background task processor — runs debates async
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taijitu-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_URL=redis://redis:6379/0
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: celery -A taijitu.tasks.worker worker --loglevel=info
+
+  # ── PROMETHEUS ────────────────────────────────────
+  # Metrics collection — tracks everything TAIJITU does
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: taijitu-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+
+  # ── GRAFANA ───────────────────────────────────────
+  # Dashboard — see everything TAIJITU detects
+  grafana:
+    image: grafana/grafana:latest
+    container_name: taijitu-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=taijitu2026
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+# ── VOLUMES ───────────────────────────────────────────
+# Persistent storage — data survives container restarts
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
+  prometheus_data:
+  grafana_data:

@@ -1,0 +1,34 @@
+# monitoring/prometheus.yml
+# Tells Prometheus what to scrape for metrics
+# Collects data every 15 seconds from TAIJITU
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: "taijitu"
+
+scrape_configs:
+
+  # ── TAIJITU API ─────────────────────────────────
+  # Collects metrics from the FastAPI application
+  - job_name: "taijitu-api"
+    static_configs:
+      - targets: ["api:8000"]
+    metrics_path: "/metrics"
+
+  # ── PROMETHEUS ITSELF ───────────────────────────
+  # Prometheus monitors itself
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ── REDIS ───────────────────────────────────────
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis:6379"]
+
+  # ── POSTGRES ────────────────────────────────────
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres:5432"]

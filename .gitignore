@@ -1,0 +1,52 @@
+# Environment — NEVER commit these
+.env
+*.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Docker
+*.log
+
+# Database
+*.db
+*.sqlite3
+
+# Models
+*.pkl
+*.joblib
+*.model
+
+# Secrets
+*.pem
+*.key
+*.p12
+secrets/
+credentials/
