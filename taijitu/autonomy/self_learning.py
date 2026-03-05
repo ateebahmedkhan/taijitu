@@ -3,7 +3,6 @@
 # TAIJITU learns from every confirmed threat
 # Retrains its own model without human help
 
-import json
 import structlog
 from datetime import datetime
 from dataclasses import dataclass
@@ -195,16 +194,16 @@ class SelfLearningEngine:
     def get_learning_summary(self) -> dict:
         """Summary of everything TAIJITU has learned"""
         confirmed = sum(
-            1 for l in self.lessons
-            if l.lesson_type == "confirmed_threat"
+            1 for lesson in self.lessons
+            if lesson.lesson_type == "confirmed_threat"
         )
         false_positives = sum(
-            1 for l in self.lessons
-            if l.lesson_type == "false_positive"
+            1 for lesson in self.lessons
+            if lesson.lesson_type == "false_positive"
         )
         corrections = sum(
-            1 for l in self.lessons
-            if l.lesson_type == "human_correction"
+            1 for lesson in self.lessons
+            if lesson.lesson_type == "human_correction"
         )
 
         return {

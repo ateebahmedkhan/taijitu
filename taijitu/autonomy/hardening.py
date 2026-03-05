@@ -3,7 +3,6 @@
 # Takes action without human input
 # Blocks IPs, updates rules, hardens system
 
-import subprocess
 import structlog
 from datetime import datetime
 from dataclasses import dataclass
