@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 
 from taijitu.storage.database import get_db
-from taijitu.storage.models import ThreatEvent, AttackerProfile, SystemHealth
+from taijitu.storage.models import ThreatEvent, AttackerProfile
 from taijitu.detection.rule_engine import rule_engine
 from taijitu.autonomy.hardening import hardening_engine
 from taijitu.autonomy.night_probe import night_probe
@@ -50,7 +50,7 @@ async def get_overview(db: Session = Depends(get_db)):
     # Attacker counts
     total_attackers = db.query(AttackerProfile).count()
     blocked_attackers = db.query(AttackerProfile).filter(
-        AttackerProfile.is_blocked == True
+        AttackerProfile.is_blocked.is_(True)
     ).count()
 
     # Rule engine stats

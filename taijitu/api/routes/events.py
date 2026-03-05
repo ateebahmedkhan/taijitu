@@ -4,7 +4,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime
 from pydantic import BaseModel
 
 from taijitu.storage.database import get_db
