@@ -49,4 +49,4 @@ env/
 *.key
 *.p12
 secrets/
-credentials/
+credentials/data/payloads/

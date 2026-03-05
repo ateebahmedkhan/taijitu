@@ -214,16 +214,9 @@ class WebScanner:
         """
         vulns = []
 
-        # SQL error payloads
-        error_payloads = [
-            "'",
-            "\"",
-            "' OR '1'='1",
-            "' OR 1=1--",
-            "'; DROP TABLE users--",
-            "1' ORDER BY 1--",
-            "1 UNION SELECT NULL--",
-        ]
+       # SQL error payloads — from PayloadsAllTheThings
+        from taijitu.red.payloads import payload_loader
+        error_payloads = payload_loader.get("sql_injection", limit=30)
 
         # SQL error signatures
         error_signatures = [
@@ -275,14 +268,9 @@ class WebScanner:
         """
         vulns = []
 
-        xss_payloads = [
-            "<script>alert(1)</script>",
-            "<img src=x onerror=alert(1)>",
-            "\"><script>alert(1)</script>",
-            "'><script>alert(1)</script>",
-            "<svg onload=alert(1)>",
-            "javascript:alert(1)",
-        ]
+        # XSS payloads — from PayloadsAllTheThings
+        from taijitu.red.payloads import payload_loader
+        xss_payloads = payload_loader.get("xss", limit=20)
 
         for payload in xss_payloads:
             response = self._get_with_param(url, param, payload)
