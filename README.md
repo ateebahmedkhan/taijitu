@@ -133,7 +133,7 @@ Follow the build journey on [LinkedIn](https://linkedin.com/in/ateebahmedkhan)
 ## Author
 
 **Ateeb Ahmed Khan**
-Self-taught cybersecurity engineer building autonomous security systems.
+Self-taught cybersecurity, building autonomous security systems.
 
 - GitHub: [@ateebahmedkhan](https://github.com/ateebahmedkhan)
 - LinkedIn: [ateebahmedkhan](https://linkedin.com/in/ateebahmedkhan)
