@@ -145,3 +145,33 @@ class TestThreatDNA:
         }
         analysis = self.dna.analyze(profile)
         assert analysis["attacker_type"] == "ransomware_operator"
+        
+# ── NATURAL LANGUAGE QUERY TESTS ─────────────────────
+
+class TestNaturalLanguageQuery:
+
+    def setup_method(self):
+        from taijitu.query.natural_language import NaturalLanguageQuery
+        self.query = NaturalLanguageQuery()
+
+    def test_query_initializes(self):
+        assert self.query.model == "llama3.2"
+        assert isinstance(self.query.query_history, list)
+
+    def test_fallback_answer(self):
+        data = {"total_events": 10, "total_attackers": 3}
+        answer = self.query._fallback_answer("test question", data)
+        assert "10" in answer
+        assert "3" in answer
+
+    def test_build_prompt(self):
+        data = {"total_events": 5}
+        prompt = self.query._build_prompt("how many events?", data)
+        assert "total_events" in prompt
+        assert "how many events?" in prompt
+
+    def test_query_history_tracked(self):
+        initial_count = len(self.query.query_history)
+        mock_data = {"total_events": 0, "total_attackers": 0}
+        self.query.ask_without_db("test question", mock_data)
+        assert len(self.query.query_history) == initial_count + 1

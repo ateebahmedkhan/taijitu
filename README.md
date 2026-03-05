@@ -1,17 +1,15 @@
-<div align="center">
-
 # ☯ TAIJITU
 
-### Two Minds. One System. Zero Blind Spots.
+<div align="center">
 
-**The world's first dual-mind autonomous cybersecurity platform.**
-Guardian and Adversary — two AI minds debating every threat in real time.
+**Two Minds. One System. Zero Blind Spots.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://python.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green.svg)](https://fastapi.tiangolo.com)
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](docker-compose.yml)
-[![Ollama](https://img.shields.io/badge/AI-Local%20%26%20Free-purple.svg)](https://ollama.ai)
+[![Docker](https://img.shields.io/badge/Docker-ready-blue.svg)](https://www.docker.com)
+[![Ollama](https://img.shields.io/badge/Ollama-local%20AI-orange.svg)](https://ollama.ai)
+[![Tests](https://img.shields.io/badge/tests-15%20passing-brightgreen.svg)]()
 
 </div>
 
@@ -19,56 +17,63 @@ Guardian and Adversary — two AI minds debating every threat in real time.
 
 ## What Is TAIJITU?
 
-TAIJITU is a free, local, autonomous cybersecurity platform that thinks like an attacker to protect like a defender.
+TAIJITU is an autonomous cybersecurity platform where two AI minds debate every threat in real time.
 
-Instead of just detecting threats — TAIJITU debates them.
+**Guardian** analyzes from the defender's perspective. **Adversary** challenges from the attacker's perspective. Together they reach a verdict — block, alert, or monitor — with zero human input required.
 
-Every suspicious event triggers a real-time argument between two AI minds:
-
-- **Guardian Mind** — analyzes from the defender's perspective. What do I know? What rules apply? What is the risk?
-- **Adversary Mind** — analyzes from the attacker's perspective. How would I exploit this? What comes next? What is the defender missing?
-
-Their debate produces a verdict — with full reasoning in plain English. No black boxes. No unexplained scores. Every decision is transparent and auditable.
-
----
-
-## The Four Products
-
-| Product | Purpose |
-|---------|---------|
-| **TAIJITU BLUE** | Autonomous SOC — real-time threat detection and response |
-| **TAIJITU RED** | Autonomous Red Team — penetration testing and bug bounty |
-| **TAIJITU PURPLE** | Intelligence Bridge — continuous Blue/Red feedback loop |
-| **TAIJITU GRC** | Compliance Engine — automatic governance and audit reporting |
+Every decision is explainable. Every action is auditable. Everything runs locally with no API costs.
 
 ---
 
 ## The Seven Pillars
 
-1. **Dual-Mind Debate** — Guardian defends, Adversary attacks, debate IS the analysis
-2. **Perpetual Attacker Memory** — every IP stored forever, full history retrieved instantly
-3. **Explainable AI Verdicts** — full reasoning chain in plain English, not just scores
-4. **Autonomous Self-Learning** — corrects own mistakes, no human retraining needed
-5. **Behavioral Threat DNA** — fingerprints attackers by behavior, survives IP changes
-6. **Adversarial Night Probe** — attacks itself at 3am to find weaknesses first
-7. **100% Free and Offline** — Ollama local LLM, no API costs, data never leaves machine
+| Pillar | Description |
+|--------|-------------|
+| 🧠 Dual-Mind Debate | Guardian vs Adversary argue every threat |
+| 🔍 Detection Engine | 20 MITRE ATT&CK mapped signatures |
+| 🧬 Threat DNA | Identifies same attacker across IP changes |
+| 🤖 Autonomy | Blocks IPs, learns, self-tests at 3am |
+| 📱 Telegram War Room | Real-time alerts on your phone |
+| 🌐 Network Intelligence | Real packet capture via Scapy |
+| 💬 Natural Language | Ask questions in plain English |
 
 ---
 
 ## Quick Start
 ```bash
-# 1. Clone the repository
-git clone https://github.com/ateebahmedkhan/taijitu.git
+git clone https://github.com/ateebahmedkhan/taijitu
 cd taijitu
-
-# 2. Copy environment template
 cp .env.example .env
-
-# 3. Start everything
 docker-compose up -d
+```
 
-# 4. Open TAIJITU
-open http://localhost:8000
+Visit `http://localhost:8000/docs` for full API documentation.
+
+---
+
+## Architecture
+```
+Raw Log / Network Packet
+        ↓
+   Rule Engine (MITRE ATT&CK)
+        ↓
+  Anomaly Detector (Isolation Forest)
+        ↓
+    Correlator (Pattern Detection)
+        ↓
+  ┌─────────────────────┐
+  │   DEBATE ENGINE     │
+  │  Guardian vs        │
+  │  Adversary          │
+  │  3 rounds           │
+  └─────────────────────┘
+        ↓
+    Verdict + Action
+        ↓
+  ┌─────┬──────┬────────┐
+  │Block│Alert │ Learn  │
+  │ IP  │Phone │& Adapt │
+  └─────┴──────┴────────┘
 ```
 
 ---
@@ -77,75 +82,76 @@ open http://localhost:8000
 
 | Layer | Technology |
 |-------|-----------|
-| AI | Ollama + Llama 3.2 — local, free, private |
-| Backend | FastAPI + Celery + Redis |
+| API | FastAPI + Uvicorn |
+| AI Minds | Ollama + Llama 3.2 (local) |
 | Database | PostgreSQL + TimescaleDB |
-| Detection | Scikit-learn Isolation Forest + MITRE ATT&CK |
-| Network | Scapy + PyShark |
-| Dashboard | Grafana + Prometheus |
-| Alerting | Telegram Bot |
+| Cache | Redis |
+| Queue | Celery |
+| Detection | scikit-learn Isolation Forest |
+| Packets | Scapy |
+| Alerts | python-telegram-bot |
+| Monitoring | Prometheus + Grafana |
+| Container | Docker Compose |
 
 ---
 
-## Architecture
+## API Endpoints
 ```
-Internet Traffic
-      ↓
-TAIJITU Ingestion Engine
-      ↓
-Rule Engine + Anomaly Detector
-      ↓
-┌─────────────────────────┐
-│   DUAL-MIND DEBATE      │
-│                         │
-│  Guardian  ←→  Adversary│
-│  (Defender)   (Attacker)│
-└─────────────────────────┘
-      ↓
-Verdict + Full Transcript
-      ↓
-Autonomous Action + Alert
+POST /events/ingest          — Ingest raw log event
+GET  /events/recent          — Recent threat events
+GET  /events/attackers       — Top attackers by score
+GET  /events/attacker/{ip}   — Full attacker profile
+POST /events/feedback        — Submit human feedback
+GET  /stats/overview         — Dashboard statistics
+GET  /stats/timeline         — Hourly event chart
+GET  /stats/tactics          — MITRE tactic breakdown
+GET  /stats/top-attackers    — Threat leaderboard
+POST /query/ask              — Natural language query
+GET  /health                 — System health check
 ```
 
 ---
 
-## Comparison
+## vs Existing Tools
 
-| Capability | Splunk | CrowdStrike | Wazuh | TAIJITU |
-|-----------|--------|-------------|-------|---------|
-| Dual-mind AI debate | ✗ | ✗ | ✗ | ✅ |
-| Perpetual attacker memory | Partial | Partial | ✗ | ✅ |
-| Explains its reasoning | ✗ | ✗ | ✗ | ✅ |
-| Red + Blue + Purple + GRC | ✗ | ✗ | ✗ | ✅ |
-| 100% free and offline | ✗ | ✗ | ✅ | ✅ |
-| Cost | $150k+/yr | $15/endpoint | Free | **Free** |
+| Feature | TAIJITU | Splunk | Wazuh | CrowdStrike |
+|---------|---------|--------|-------|-------------|
+| Dual-Mind Debate | ✅ | ❌ | ❌ | ❌ |
+| Local AI (no API cost) | ✅ | ❌ | ❌ | ❌ |
+| Behavioral DNA | ✅ | ❌ | ❌ | ✅ |
+| Self-Testing at 3am | ✅ | ❌ | ❌ | ❌ |
+| Natural Language Query | ✅ | ✅ | ❌ | ✅ |
+| Free & Open Source | ✅ | ❌ | ✅ | ❌ |
+| Runs on MacBook | ✅ | ❌ | ✅ | ❌ |
 
 ---
 
-## Status
-
-🔴 Currently in active development — Phase 1 Foundation
-
-Follow the build journey on [LinkedIn](https://linkedin.com/in/ateebahmedkhan)
+## Project Status
+```
+✅ Phase 1  — Foundation (7 Docker services)
+✅ Phase 2  — Detection Engine (20 MITRE signatures)
+✅ Phase 3  — Memory Engine (attacker profiles + DNA)
+✅ Phase 4  — Dual-Mind Debate (Guardian vs Adversary)
+✅ Phase 5  — Autonomy Engine (block, learn, self-test)
+✅ Phase 6  — Telegram War Room (real-time alerts)
+✅ Phase 7  — Network Intelligence (packet capture)
+✅ Phase 8  — Dashboard API (17 endpoints)
+✅ Phase 9  — Natural Language Query
+✅ Phase 10 — Polish and Launch
+```
 
 ---
 
 ## Author
 
 **Ateeb Ahmed Khan**
-Self-taught cybersecurity, building autonomous security systems.
+B.Tech Metallurgical Engineering → Self-taught Cybersecurity
 
-- GitHub: [@ateebahmedkhan](https://github.com/ateebahmedkhan)
-- LinkedIn: [ateebahmedkhan](https://linkedin.com/in/ateebahmedkhan)
+[![GitHub](https://img.shields.io/badge/GitHub-ateebahmedkhan-black.svg)](https://github.com/ateebahmedkhan)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-ateebahmedkhan-blue.svg)](https://linkedin.com/in/ateebahmedkhan)
 
 ---
 
 ## License
 
-MIT License — free to use, modify, and distribute with attribution.
-
----
-
-<div align="center">
-☯ <strong>TAIJITU</strong> — Two Minds. One System. Zero Blind Spots.
-</div>
+MIT License — free to use, modify, and distribute.

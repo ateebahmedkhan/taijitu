@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from taijitu.api.routes.events import router as events_router
 from taijitu.api.routes.stats import router as stats_router
+from taijitu.api.routes.query import router as query_router
 
 log = structlog.get_logger()
 
@@ -31,6 +32,7 @@ app.add_middleware(
 
 # ── ROUTES ────────────────────────────────────────────
 app.include_router(events_router)
+app.include_router(query_router)
 app.include_router(stats_router)
 
 

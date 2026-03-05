@@ -111,12 +111,14 @@ class NaturalLanguageQuery:
             log.error("query_failed", error=str(e))
             answer = self._fallback_answer(question, mock_data)
 
-        return QueryResult(
+        result = QueryResult(
             question=question,
             answer=answer,
             data_used=mock_data,
             timestamp=datetime.utcnow(),
         )
+        self.query_history.append(result)
+        return result
 
     def _gather_data(self, question: str, db) -> dict:
         """
