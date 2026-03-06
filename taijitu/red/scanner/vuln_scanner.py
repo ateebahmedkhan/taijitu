@@ -270,17 +270,81 @@ class VulnerabilityScanner:
         return found
 
     def _is_interesting(self, path: str, response) -> bool:
-        """Determine if a file response is actually interesting"""
-        high_value = [".git", ".env", "config", "backup", "admin"]
-        if any(h in path for h in high_value):
-            return True
-        if response.status_code == 200 and len(response.content) > 100:
-            return True
-        return False
+        """
+        Determine if a file response is actually interesting.
+        Filters out soft 404s — pages that return 200 but are
+        actually error pages with custom messages.
+        """
+        # 403 alone is not a vulnerability — just means it exists
+        # but is blocked. Not reportable on most programs.
+        if response.status_code == 403:
+            return False
 
-    def _analyze_findings(self, result: ScanResult) -> list:
-        """Convert raw findings into structured vulnerabilities"""
-        vulns = []
+        # Must be 200 to be interesting
+        if response.status_code not in (200, 301, 302):
+            return False
+
+        content = response.text.lower()
+
+        # Soft 404 detection — site returns 200 but page is an error
+        soft_404_signals = [
+            "page not found",
+            "404",
+            "not found",
+            "does not exist",
+            "no longer available",
+            "has been moved",
+            "has been deleted",
+            "been removed",
+            "cannot be found",
+            "could not be found",
+            "page you requested",
+            "page you were looking",
+            "we're sorry",
+            "we are sorry",
+            "error 404",
+            "http 404",
+            "moved or deleted",
+        ]
+        if any(signal in content for signal in soft_404_signals):
+            return False
+
+        # Must have meaningful content size
+        if len(response.content) < 50:
+            return False
+
+        # .git/HEAD must contain actual git ref
+        if ".git/HEAD" in path:
+            return "ref:" in content or "sha1" in content.lower()
+
+        # .env must look like environment file
+        if ".env" in path:
+            return any(
+                k in content
+                for k in ["password", "secret", "key", "token", "db_"]
+            )
+
+        # robots.txt — always mildly interesting if real
+        if "robots.txt" in path:
+            return "disallow" in content or "allow" in content
+
+        # swagger/openapi — real API docs
+        if "swagger" in path or "openapi" in path:
+            return "swagger" in content or "openapi" in content
+
+        # admin/phpmyadmin — only if actual login page loads
+        if any(p in path for p in ["/admin", "/phpmyadmin"]):
+            return any(
+                k in content
+                for k in ["login", "password", "username", "sign in"]
+            )
+
+        # backup — only if real file content
+        if "backup" in path:
+            return len(response.content) > 1000
+
+        # Default — real content only
+        return len(response.content) > 200
 
         # Analyze security headers
         headers = result.security_headers.get("security_headers", {})
@@ -337,7 +401,68 @@ class VulnerabilityScanner:
                 ))
 
         return vulns
+    def _analyze_findings(self, result: ScanResult) -> list:
+        """Convert raw findings into structured vulnerabilities"""
+        vulns = []
 
+        # Analyze security headers
+        headers = result.security_headers.get("security_headers", {})
+        for header_name, header_data in headers.items():
+            if not header_data.get("present"):
+                vulns.append(Vulnerability(
+                    name=f"Missing {header_name} Header",
+                    severity=header_data["severity"],
+                    description=header_data["description"],
+                    evidence=f"Header '{header_name}' not present in response",
+                    url=result.target,
+                    remediation=f"Add '{header_name}' header to all responses",
+                ))
+
+        # Information disclosure
+        disclosure = result.security_headers.get(
+            "information_disclosure", {}
+        )
+        for header, value in disclosure.items():
+            vulns.append(Vulnerability(
+                name=f"Information Disclosure via {header}",
+                severity="low",
+                description=f"Server reveals {header}: {value}",
+                evidence=f"{header}: {value}",
+                url=result.target,
+                remediation=f"Remove or obscure the {header} header",
+            ))
+
+        # SSL issues
+        for issue in result.ssl_issues:
+            vulns.append(Vulnerability(
+                name=issue["type"].replace("_", " ").title(),
+                severity=issue["severity"],
+                description=issue["description"],
+                evidence="SSL/TLS configuration issue detected",
+                url=result.target,
+                remediation="Configure proper SSL/TLS settings",
+            ))
+
+        # Interesting files — only real ones after _is_interesting filter
+        for file_info in result.interesting_files:
+            if file_info.get("interesting"):
+                severity = "high" if any(
+                    s in file_info["path"]
+                    for s in [".git", ".env", "config"]
+                ) else "medium"
+                vulns.append(Vulnerability(
+                    name=f"Sensitive File Exposed: {file_info['path']}",
+                    severity=severity,
+                    description=(
+                        f"Sensitive file accessible at {file_info['url']}"
+                    ),
+                    evidence=f"HTTP {file_info['status_code']} response "
+                             f"with {file_info['size']} bytes of content",
+                    url=file_info["url"],
+                    remediation="Restrict access to sensitive files",
+                ))
+
+        return vulns
     def _calculate_score(self, result: ScanResult) -> float:
         """Calculate overall vulnerability score"""
         score = 0.0

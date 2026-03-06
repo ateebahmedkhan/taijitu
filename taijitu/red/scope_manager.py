@@ -1,8 +1,10 @@
 # taijitu/red/scope_manager.py
 # Scope Manager — safety layer for authorized testing
+# Programs persist to disk — survive restarts
 # NEVER tests targets outside defined scope
-# One out-of-scope test = permanent ban on bug bounty platforms
 
+import json
+import os
 import structlog
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -10,121 +12,166 @@ from urllib.parse import urlparse
 
 log = structlog.get_logger()
 
+# Persist programs here — survives restarts
+SCOPE_FILE = os.path.expanduser("~/.taijitu/scope.json")
+
 
 @dataclass
 class BugBountyProgram:
-    """A bug bounty program with defined scope"""
-    name: str
-    platform: str                    # hackerone, bugcrowd, intigriti
-    in_scope: list                   # domains/IPs allowed to test
-    out_of_scope: list               # explicitly forbidden targets
-    vulnerability_types: list        # what types are in scope
-    max_severity: str                # max severity they accept
-    notes: str = ""
-    added_at: datetime = None
+    name:                str
+    platform:            str
+    in_scope:            list = field(default_factory=list)
+    out_of_scope:        list = field(default_factory=list)
+    vulnerability_types: list = field(default_factory=list)
+    max_severity:        str  = "critical"
+    notes:               str  = ""
+    added_at:            str  = ""
 
     def __post_init__(self):
         if not self.added_at:
-            self.added_at = datetime.utcnow()
+            self.added_at = datetime.utcnow().isoformat()
+
+    def to_dict(self):
+        return {
+            "name":                self.name,
+            "platform":            self.platform,
+            "in_scope":            self.in_scope,
+            "out_of_scope":        self.out_of_scope,
+            "vulnerability_types": self.vulnerability_types,
+            "max_severity":        self.max_severity,
+            "notes":               self.notes,
+            "added_at":            self.added_at,
+        }
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(
+            name=d.get("name", ""),
+            platform=d.get("platform", ""),
+            in_scope=d.get("in_scope", []),
+            out_of_scope=d.get("out_of_scope", []),
+            vulnerability_types=d.get("vulnerability_types", []),
+            max_severity=d.get("max_severity", "critical"),
+            notes=d.get("notes", ""),
+            added_at=d.get("added_at", ""),
+        )
 
 
 @dataclass
 class ScopeCheck:
-    """Result of a scope check"""
-    target: str
-    is_in_scope: bool
-    reason: str
-    program: str = ""
+    target:       str
+    is_in_scope:  bool
+    reason:       str
+    program:      str  = ""
     safe_to_test: bool = False
 
 
 class ScopeManager:
     """
-    Scope management and safety system
-
-    Before ANY scan or test:
-    1. Check if target is in scope
-    2. Check if target is explicitly out of scope
-    3. Check if vulnerability type is in scope
-    4. Only proceed if all checks pass
-
-    This is not optional — it is hardcoded into
-    every RED module to run automatically.
-
-    IMPORTANT: Always read the program's scope page
-    before adding it here. Scope changes frequently.
+    Scope management and safety system.
+    Programs persist to ~/.taijitu/scope.json
+    Survives restarts — no re-entry needed.
     """
 
     def __init__(self):
-        self.programs: dict = {}
-        self.test_log: list = []
+        self.programs:       dict = {}
+        self.current_program = None
+        self.test_log:  list = []
+        self._ensure_dir()
         self._add_practice_targets()
-        log.info("scope_manager_initialized")
+        self._load()
+        log.info("scope_manager_initialized",
+                 programs=len(self.programs))
 
-    def add_program(self, program: BugBountyProgram) -> None:
-        """Add a bug bounty program to scope manager"""
+    def _ensure_dir(self):
+        os.makedirs(os.path.dirname(SCOPE_FILE), exist_ok=True)
+
+    def _load(self):
+        """Load programs from disk"""
+        if not os.path.exists(SCOPE_FILE):
+            return
+        try:
+            with open(SCOPE_FILE) as f:
+                data = json.load(f)
+            for d in data.get("programs", []):
+                p = BugBountyProgram.from_dict(d)
+                if p.name not in self.programs:
+                    self.programs[p.name] = p
+            log.info("scope_loaded",
+                     programs=len(self.programs))
+        except Exception as e:
+            log.error("scope_load_error", error=str(e))
+
+    def _save(self):
+        """Persist programs to disk"""
+        try:
+            # Don't save practice targets
+            to_save = [
+                p.to_dict()
+                for p in self.programs.values()
+                if p.platform != "self-hosted"
+            ]
+            with open(SCOPE_FILE, "w") as f:
+                json.dump({"programs": to_save}, f, indent=2)
+            log.info("scope_saved", programs=len(to_save))
+        except Exception as e:
+            log.error("scope_save_error", error=str(e))
+
+    def add_program(self, program: BugBountyProgram):
         self.programs[program.name] = program
-        log.info(
-            "program_added",
-            name=program.name,
-            platform=program.platform,
-            in_scope_count=len(program.in_scope),
-        )
+        self._save()
+        log.info("program_added",
+                 name=program.name,
+                 platform=program.platform,
+                 in_scope_count=len(program.in_scope))
 
     def check(self, target_url: str) -> ScopeCheck:
-        """
-        Check if a target is in scope for any program
-        MUST be called before any scan or test
-        Returns ScopeCheck with is_in_scope and reason
-        """
         parsed = urlparse(target_url)
         domain = parsed.netloc or target_url
-
-        # Remove port from domain
-        domain = domain.split(":")[0]
+        domain = domain.split(":")[0].lower().strip()
 
         log.info("scope_check", target=domain)
 
-        # Check against all programs
         for program_name, program in self.programs.items():
 
-            # Check explicit out-of-scope first
+            # Out of scope check first
             for oos in program.out_of_scope:
                 if self._matches(domain, oos):
                     result = ScopeCheck(
                         target=target_url,
                         is_in_scope=False,
-                        reason=f"Explicitly OUT OF SCOPE in {program_name}: {oos}",
+                        reason=f"OUT OF SCOPE in {program_name}: {oos}",
                         program=program_name,
                         safe_to_test=False,
                     )
-                    log.warning(
-                        "out_of_scope_blocked",
-                        target=domain,
-                        program=program_name,
-                    )
+                    log.warning("out_of_scope_blocked",
+                                target=domain,
+                                program=program_name)
                     self._log_check(result)
                     return result
 
-            # Check in-scope
+            # In scope check
             for ins in program.in_scope:
-                if self._matches(domain, ins):
+                # Handle dict entries from HackerOne API
+                if isinstance(ins, dict):
+                    asset = ins.get("asset", "")
+                else:
+                    asset = ins
+
+                if self._matches(domain, asset):
                     result = ScopeCheck(
                         target=target_url,
                         is_in_scope=True,
-                        reason=f"In scope for {program_name}: matches {ins}",
+                        reason=f"In scope: {program_name} — {asset}",
                         program=program_name,
                         safe_to_test=True,
                     )
-                    log.info(
-                        "target_in_scope",
-                        target=domain,
-                        program=program_name,
-                    )
+                    log.info("target_in_scope",
+                             target=domain,
+                             program=program_name)
                     self._log_check(result)
                     return result
 
-        # Not found in any program
         result = ScopeCheck(
             target=target_url,
             is_in_scope=False,
@@ -136,131 +183,100 @@ class ScopeManager:
         self._log_check(result)
         return result
 
-    def check_vuln_type(
-        self,
-        program_name: str,
-        vuln_type: str,
-    ) -> bool:
-        """Check if a vulnerability type is in scope for a program"""
+    def check_vuln_type(self, program_name, vuln_type):
         program = self.programs.get(program_name)
         if not program:
             return False
-
-        # If no restrictions specified — all types allowed
         if not program.vulnerability_types:
             return True
-
         return any(
             vuln_type.lower() in vt.lower()
             for vt in program.vulnerability_types
         )
 
-    def get_in_scope_targets(self, program_name: str) -> list:
-        """Get all in-scope targets for a program"""
+    def get_in_scope_targets(self, program_name):
         program = self.programs.get(program_name)
         if not program:
             return []
         return program.in_scope
 
-    def list_programs(self) -> list:
-        """List all registered programs"""
+    def list_programs(self):
         return [
             {
-                "name": p.name,
-                "platform": p.platform,
-                "in_scope_count": len(p.in_scope),
+                "name":            p.name,
+                "platform":        p.platform,
+                "in_scope_count":  len(p.in_scope),
                 "out_of_scope_count": len(p.out_of_scope),
-                "added_at": p.added_at.isoformat(),
+                "added_at":        p.added_at,
             }
             for p in self.programs.values()
         ]
 
-    def get_test_log(self) -> list:
-        """Get log of all scope checks performed"""
-        return [
-            {
-                "target": c.target,
-                "in_scope": c.is_in_scope,
-                "reason": c.reason,
-                "program": c.program,
-            }
-            for c in self.test_log
-        ]
-
-    def safe_scan(
-        self,
-        target_url: str,
-        scan_function,
-        *args,
-        **kwargs,
-    ):
-        """
-        Wrapper that checks scope before running any scan
-        Use this to wrap all RED module scans
-
-        Example:
-            result = scope_manager.safe_scan(
-                'https://target.com',
-                web_scanner.scan,
-                'https://target.com',
-            )
-        """
+    def safe_scan(self, target_url, scan_function, *args, **kwargs):
         scope_check = self.check(target_url)
-
         if not scope_check.safe_to_test:
-            log.error(
-                "scan_blocked_out_of_scope",
-                target=target_url,
-                reason=scope_check.reason,
-            )
+            log.error("scan_blocked_out_of_scope",
+                      target=target_url,
+                      reason=scope_check.reason)
             return {
-                "error": "OUT OF SCOPE",
-                "target": target_url,
-                "reason": scope_check.reason,
+                "error":        "OUT OF SCOPE",
+                "target":       target_url,
+                "reason":       scope_check.reason,
                 "safe_to_test": False,
             }
-
-        log.info(
-            "scope_check_passed_proceeding",
-            target=target_url,
-            program=scope_check.program,
-        )
         return scan_function(*args, **kwargs)
 
     def _matches(self, domain: str, pattern: str) -> bool:
         """
-        Check if domain matches a scope pattern
-        Supports wildcards: *.example.com
+        Match domain against scope pattern.
+        Supports:
+          *.example.com  — any subdomain
+          example.com    — exact + subdomains
+          https://...    — strips protocol first
         """
+        # Strip protocol if present
+        if "://" in pattern:
+            pattern = pattern.split("://")[1]
+
+        # Strip paths
+        pattern = pattern.split("/")[0]
         pattern = pattern.lower().strip()
-        domain = domain.lower().strip()
+        domain  = domain.lower().strip()
+
+        if not pattern:
+            return False
 
         # Exact match
         if domain == pattern:
             return True
 
-        # Wildcard match — *.example.com
+        # Wildcard *.example.com
         if pattern.startswith("*."):
             base = pattern[2:]
             if domain == base or domain.endswith(f".{base}"):
                 return True
 
-        # Subdomain match — example.com matches sub.example.com
+        # Pattern is bare domain — match subdomains too
         if domain.endswith(f".{pattern}"):
             return True
 
         return False
 
-    def _log_check(self, check: ScopeCheck) -> None:
-        """Log scope check for audit trail"""
+    def _log_check(self, check: ScopeCheck):
         self.test_log.append(check)
 
-    def _add_practice_targets(self) -> None:
-        """
-        Add known safe practice targets
-        These are deliberately vulnerable apps for testing
-        Always safe to test
-        """
+    def get_test_log(self):
+        return [
+            {
+                "target":    c.target,
+                "in_scope":  c.is_in_scope,
+                "reason":    c.reason,
+                "program":   c.program,
+            }
+            for c in self.test_log
+        ]
+
+    def _add_practice_targets(self):
         practice = BugBountyProgram(
             name="Practice Targets",
             platform="self-hosted",
@@ -275,9 +291,9 @@ class ScopeManager:
             out_of_scope=[],
             vulnerability_types=[],
             max_severity="critical",
-            notes="Deliberately vulnerable apps — always safe to test",
+            notes="Deliberately vulnerable apps — safe to test",
         )
-        self.add_program(practice)
+        self.programs[practice.name] = practice
 
 
 # ── GLOBAL INSTANCE ───────────────────────────────────

@@ -86,28 +86,44 @@ class WebScanner:
             target_url
         )
 
-        # Step 2 — Test each parameter for each vuln type
+        # Step 2 — Test each parameter with hard timeout
+        import time
+        phase_start = time.time()
+        MAX_PHASE_SECONDS = 180  # 3 minutes max
+        MAX_URLS = 30            # max URLs to test
+
+        tested = 0
         for url, params in result.parameters_found:
+            if tested >= MAX_URLS:
+                log.info("web_scan_url_limit_reached", tested=tested)
+                break
+            if time.time() - phase_start > MAX_PHASE_SECONDS:
+                log.info("web_scan_timeout_reached",
+                         elapsed=int(time.time() - phase_start))
+                break
+
             for param in params:
-                # SQL Injection
+                if time.time() - phase_start > MAX_PHASE_SECONDS:
+                    break
+
                 sqli_vulns = self._test_sqli(url, param)
                 result.vulnerabilities.extend(sqli_vulns)
 
-                # XSS
                 xss_vulns = self._test_xss(url, param)
                 result.vulnerabilities.extend(xss_vulns)
 
-                # Open Redirect
                 redirect_vulns = self._test_open_redirect(url, param)
                 result.vulnerabilities.extend(redirect_vulns)
 
-                # Path Traversal
                 traversal_vulns = self._test_path_traversal(url, param)
                 result.vulnerabilities.extend(traversal_vulns)
 
-        # Step 3 — Test for SSRF on full URLs
-        ssrf_vulns = self._test_ssrf(target_url)
-        result.vulnerabilities.extend(ssrf_vulns)
+            tested += 1
+
+        # Step 3 — SSRF only if time remaining
+        if time.time() - phase_start < MAX_PHASE_SECONDS:
+            ssrf_vulns = self._test_ssrf(target_url)
+            result.vulnerabilities.extend(ssrf_vulns)
 
         result.total_requests = self.total_requests
 
